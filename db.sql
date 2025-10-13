@@ -387,6 +387,25 @@ CREATE INDEX IF NOT EXISTS idx_pgs_owner_id ON public.pgs(owner_id);
 CREATE INDEX IF NOT EXISTS idx_pgs_metadata_pg_id ON public.pgs_metadata(pg_id);
 
 -- ============================================
+-- NEW MUTATION QUERIES FOR PGS TABLE
+-- ============================================
+
+-- Add new columns to pgs table for room rent information
+ALTER TABLE public.pgs ADD COLUMN IF NOT EXISTS ac_room_rent DECIMAL(10,2);
+ALTER TABLE public.pgs ADD COLUMN IF NOT EXISTS non_ac_room_rent DECIMAL(10,2);
+ALTER TABLE public.pgs ADD COLUMN IF NOT EXISTS gender_preference TEXT CHECK (gender_preference IN ('boys', 'girls', 'both'));
+
+-- ============================================
+-- NEW MUTATION QUERIES FOR PGS_METADATA TABLE  
+-- ============================================
+
+-- Add new columns to pgs_metadata table for property structure information
+ALTER TABLE public.pgs_metadata ADD COLUMN IF NOT EXISTS total_floors INTEGER;
+ALTER TABLE public.pgs_metadata ADD COLUMN IF NOT EXISTS total_rooms INTEGER;
+ALTER TABLE public.pgs_metadata ADD COLUMN IF NOT EXISTS total_ac_rooms INTEGER;
+ALTER TABLE public.pgs_metadata ADD COLUMN IF NOT EXISTS total_non_ac_rooms INTEGER;
+
+-- ============================================
 -- NOTES
 -- ============================================
 -- 1. All timestamps are in UTC
@@ -394,4 +413,5 @@ CREATE INDEX IF NOT EXISTS idx_pgs_metadata_pg_id ON public.pgs_metadata(pg_id);
 -- 3. Triggers automatically create profiles on user signup
 -- 4. User type is determined by raw_user_meta_data during signup
 -- 5. PG owners can manage multiple PG properties
+-- 6. New fields added for room rent and property structure information
 -- ============================================
