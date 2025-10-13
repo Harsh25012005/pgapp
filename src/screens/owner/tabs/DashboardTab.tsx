@@ -30,7 +30,6 @@ export const DashboardTab: React.FC = () => {
         if (error) throw error;
 
         setPgs(data || []);
-        console.log(data);
         setPgCount(count || 0);
 
         // Set first PG as selected by default if none selected
@@ -38,7 +37,6 @@ export const DashboardTab: React.FC = () => {
           setSelectedPG(data[0]);
         }
       } catch (error) {
-        console.error('Error fetching PGs:', error);
       } finally {
         setLoading(false);
       }
@@ -75,9 +73,7 @@ export const DashboardTab: React.FC = () => {
             <TouchableOpacity
               className="ml-4 rounded-lg border border-gray-200 bg-white px-3 py-2 min-w-[120px]"
               onPress={() => {
-                console.log('Header dropdown button pressed, current showDropdown:', showDropdown);
                 setShowDropdown(true);
-                console.log('Setting showDropdown to true');
               }}>
               {loading ? (
                 <View className="flex-row items-center">
@@ -187,7 +183,6 @@ export const DashboardTab: React.FC = () => {
           <TouchableOpacity
             className="flex-1"
             onPress={() => {
-              console.log('Background pressed, closing dropdown');
               setShowDropdown(false);
             }}>
             <View className="flex-1 justify-center px-8">
@@ -203,7 +198,6 @@ export const DashboardTab: React.FC = () => {
                         key={item.id}
                         className="border-b border-gray-100 p-4"
                         onPress={() => {
-                          console.log('Selected PG:', item.name);
                           handlePGSelect(item);
                         }}>
                         <Text className="text-base font-medium text-gray-900">{item.name}</Text>
@@ -220,7 +214,6 @@ export const DashboardTab: React.FC = () => {
                 <TouchableOpacity
                   className="border-t border-gray-200 p-4"
                   onPress={() => {
-                    console.log('Cancel pressed');
                     setShowDropdown(false);
                   }}>
                   <Text className="text-center text-base font-medium text-gray-500">Cancel</Text>
