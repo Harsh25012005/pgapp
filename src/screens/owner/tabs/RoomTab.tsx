@@ -19,7 +19,7 @@ export const RoomTab: React.FC = () => {
 
   const fetchPGs = async () => {
     try {
-      if (!ownerProfile?.pg_ids || ownerProfile.pg_ids.length === 0) {
+      if (!ownerProfile?.id) {
         setPgs([]);
         setLoading(false);
         return;
@@ -28,7 +28,7 @@ export const RoomTab: React.FC = () => {
       const { data, error } = await supabase
         .from('pgs')
         .select('*')
-        .in('id', ownerProfile.pg_ids)
+        .eq('owner_id', ownerProfile.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -44,7 +44,7 @@ export const RoomTab: React.FC = () => {
 
   useEffect(() => {
     fetchPGs();
-  }, [ownerProfile?.pg_ids]);
+  }, [ownerProfile?.id]);
 
   const onRefresh = () => {
     setRefreshing(true);

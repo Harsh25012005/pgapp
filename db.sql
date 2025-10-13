@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS public.pgs (
     description TEXT,
     amenities TEXT[],
     images TEXT[],
+    owner_id UUID REFERENCES public.owner_profiles(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -39,7 +40,6 @@ CREATE TABLE IF NOT EXISTS public.owner_profiles (
     name TEXT NOT NULL,
     email TEXT NOT NULL UNIQUE,
     contact_no TEXT NOT NULL,
-    pg_ids UUID[] DEFAULT '{}',
     avatar_url TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -94,21 +94,12 @@ BEGIN
         
         -- If PG data is provided, create PG entry
         IF NEW.raw_user_meta_data->>'pg_name' IS NOT NULL THEN
-            DECLARE
-                new_pg_id UUID;
-            BEGIN
-                INSERT INTO public.pgs (name, location)
-                VALUES (
-                    NEW.raw_user_meta_data->>'pg_name',
-                    COALESCE(NEW.raw_user_meta_data->>'pg_location', '')
-                )
-                RETURNING id INTO new_pg_id;
-                
-                -- Update owner_profiles with the new PG ID
-                UPDATE public.owner_profiles
-                SET pg_ids = array_append(pg_ids, new_pg_id)
-                WHERE id = NEW.id;
-            END;
+            INSERT INTO public.pgs (name, location, owner_id)
+            VALUES (
+                NEW.raw_user_meta_data->>'pg_name',
+                COALESCE(NEW.raw_user_meta_data->>'pg_location', ''),
+                NEW.id
+            );
         END IF;
     END IF;
     
@@ -231,26 +222,14 @@ CREATE POLICY "Owners can update own PGs"
     ON public.pgs
     FOR UPDATE
     TO authenticated
-    USING (
-        EXISTS (
-            SELECT 1 FROM public.owner_profiles
-            WHERE id = auth.uid()
-            AND id = ANY(pg_ids)
-        )
-    );
+    USING (owner_id = auth.uid());
 
 -- Owners can delete their own PGs
 CREATE POLICY "Owners can delete own PGs"
     ON public.pgs
     FOR DELETE
     TO authenticated
-    USING (
-        EXISTS (
-            SELECT 1 FROM public.owner_profiles
-            WHERE id = auth.uid()
-            AND id = ANY(pg_ids)
-        )
-    );
+    USING (owner_id = auth.uid());
 
 -- User Metadata Policies
 -- Users can view their own metadata
@@ -274,6 +253,7 @@ CREATE INDEX IF NOT EXISTS idx_owner_profiles_email ON public.owner_profiles(ema
 CREATE INDEX IF NOT EXISTS idx_user_metadata_user_id ON public.user_metadata(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_metadata_user_type ON public.user_metadata(user_type);
 CREATE INDEX IF NOT EXISTS idx_pgs_location ON public.pgs(location);
+CREATE INDEX IF NOT EXISTS idx_pgs_owner_id ON public.pgs(owner_id);
 
 -- ============================================
 -- NOTES

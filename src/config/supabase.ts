@@ -32,7 +32,6 @@ export interface OwnerProfile {
   name: string;
   email: string;
   contact_no: string;
-  pg_ids: string[];
   avatar_url?: string;
   created_at: string;
   updated_at: string;
@@ -46,6 +45,7 @@ export interface PG {
   description?: string;
   amenities?: string[];
   images?: string[];
+  owner_id: string;
   created_at: string;
   updated_at: string;
 }

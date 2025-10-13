@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,11 +16,32 @@ export const OwnerProfile: React.FC = () => {
   const { ownerProfile, user, signOut, refreshProfile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [pgCount, setPgCount] = useState(0);
 
   // Form state
   const [name, setName] = useState(ownerProfile?.name || '');
   const [contactNo, setContactNo] = useState(ownerProfile?.contact_no || '');
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+  useEffect(() => {
+    const fetchPGCount = async () => {
+      if (!ownerProfile?.id) return;
+      
+      try {
+        const { count, error } = await supabase
+          .from('pgs')
+          .select('*', { count: 'exact', head: true })
+          .eq('owner_id', ownerProfile.id);
+        
+        if (error) throw error;
+        setPgCount(count || 0);
+      } catch (error) {
+        console.error('Error fetching PG count:', error);
+      }
+    };
+
+    fetchPGCount();
+  }, [ownerProfile?.id]);
 
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {};
@@ -171,7 +192,7 @@ export const OwnerProfile: React.FC = () => {
             <View className="mb-6">
               <Text className="text-sm font-medium text-gray-900 mb-2">Properties</Text>
               <Text className="text-base text-gray-900 py-3 border-b border-gray-200">
-                {ownerProfile?.pg_ids?.length || 0} PG{ownerProfile?.pg_ids?.length !== 1 ? 's' : ''}
+                {pgCount} PG{pgCount !== 1 ? 's' : ''}
               </Text>
             </View>
 
