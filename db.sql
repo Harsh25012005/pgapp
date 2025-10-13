@@ -21,18 +21,6 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
 );
 
 -- PG (Paying Guest) Properties Table
-CREATE TABLE IF NOT EXISTS public.pgs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name TEXT NOT NULL,
-    location TEXT NOT NULL,
-    address TEXT,
-    description TEXT,
-    amenities TEXT[],
-    images TEXT[],
-    owner_id UUID REFERENCES public.owner_profiles(id) ON DELETE CASCADE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
 
 -- Owner Profiles Table (for PG owners)
 CREATE TABLE IF NOT EXISTS public.owner_profiles (
@@ -45,12 +33,109 @@ CREATE TABLE IF NOT EXISTS public.owner_profiles (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS public.pgs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    location TEXT NOT NULL,
+    address TEXT,
+    description TEXT,
+    amenities TEXT[],
+    images TEXT[],
+    owner_id UUID REFERENCES public.owner_profiles(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 -- User Type Metadata Table (to distinguish between user types)
 CREATE TABLE IF NOT EXISTS public.user_metadata (
     user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     user_type TEXT NOT NULL CHECK (user_type IN ('user', 'owner')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- PG Metadata Table (for flexible property attributes)
+CREATE TABLE IF NOT EXISTS public.pgs_metadata (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    pg_id UUID REFERENCES public.pgs(id) ON DELETE CASCADE,
+    amenities TEXT[],
+    boys_only BOOLEAN DEFAULT FALSE,
+    girls_only BOOLEAN DEFAULT FALSE,
+    property_type TEXT, -- e.g., 'apartment', 'villa', 'hostel'
+    furnishing_status TEXT, -- e.g., 'fully_furnished', 'semi_furnished', 'unfurnished'
+    parking_available BOOLEAN DEFAULT FALSE,
+    wifi_available BOOLEAN DEFAULT FALSE,
+    ac_available BOOLEAN DEFAULT FALSE,
+    laundry_available BOOLEAN DEFAULT FALSE,
+    security_deposit DECIMAL(10,2),
+    monthly_rent DECIMAL(10,2),
+    electricity_charges TEXT, -- e.g., 'included', 'separate', 'per_unit'
+    water_charges TEXT, -- e.g., 'included', 'separate'
+    food_provided BOOLEAN DEFAULT FALSE,
+    guest_allowed BOOLEAN DEFAULT FALSE,
+    smoking_allowed BOOLEAN DEFAULT FALSE,
+    pets_allowed BOOLEAN DEFAULT FALSE,
+    curfew_time TIME,
+    notice_period_days INTEGER DEFAULT 30,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- TABLE MUTATIONS (For Existing Tables)
+-- ============================================
+
+-- Run these commands if you already have existing tables in your Supabase database
+-- These ALTER TABLE commands will add new columns to existing tables safely
+
+-- Create pgs_metadata table for existing databases
+CREATE TABLE IF NOT EXISTS public.pgs_metadata (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    pg_id UUID REFERENCES public.pgs(id) ON DELETE CASCADE,
+    amenities TEXT[],
+    boys_only BOOLEAN DEFAULT FALSE,
+    girls_only BOOLEAN DEFAULT FALSE,
+    property_type TEXT,
+    furnishing_status TEXT,
+    parking_available BOOLEAN DEFAULT FALSE,
+    wifi_available BOOLEAN DEFAULT FALSE,
+    ac_available BOOLEAN DEFAULT FALSE,
+    laundry_available BOOLEAN DEFAULT FALSE,
+    security_deposit DECIMAL(10,2),
+    monthly_rent DECIMAL(10,2),
+    electricity_charges TEXT,
+    water_charges TEXT,
+    food_provided BOOLEAN DEFAULT FALSE,
+    guest_allowed BOOLEAN DEFAULT FALSE,
+    smoking_allowed BOOLEAN DEFAULT FALSE,
+    pets_allowed BOOLEAN DEFAULT FALSE,
+    curfew_time TIME,
+    notice_period_days INTEGER DEFAULT 30,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Add amenities field as TEXT instead of TEXT[] if needed
+-- ALTER TABLE public.pgs ALTER COLUMN amenities TYPE TEXT;
+
+-- Add address field if missing
+-- ALTER TABLE public.pgs ADD COLUMN IF NOT EXISTS address TEXT;
+
+-- Add description field if missing  
+-- ALTER TABLE public.pgs ADD COLUMN IF NOT EXISTS description TEXT;
+
+-- Add images field if missing
+-- ALTER TABLE public.pgs ADD COLUMN IF NOT EXISTS images TEXT[];
+
+-- Update existing records to set default values (optional)
+-- UPDATE public.pgs SET boys_only = FALSE WHERE boys_only IS NULL;
+-- UPDATE public.pgs SET girls_only = FALSE WHERE girls_only IS NULL;
+
+-- ============================================
+-- REMOVE COLUMNS (Drop Commands)
+-- ============================================
+
+-- Remove gender restriction fields from pgs table
+ALTER TABLE public.pgs DROP COLUMN IF EXISTS boys_only;
+ALTER TABLE public.pgs DROP COLUMN IF EXISTS girls_only;
 
 -- ============================================
 -- FUNCTIONS
@@ -158,6 +243,7 @@ ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.owner_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pgs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_metadata ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pgs_metadata ENABLE ROW LEVEL SECURITY;
 
 -- User Profiles Policies
 -- Users can view their own profile
@@ -244,6 +330,50 @@ CREATE POLICY "Users can insert own metadata"
     FOR INSERT
     WITH CHECK (auth.uid() = user_id);
 
+-- PG Metadata Policies
+-- Anyone can view PG metadata (for browsing properties)
+CREATE POLICY "Anyone can view PG metadata"
+    ON public.pgs_metadata
+    FOR SELECT
+    TO authenticated
+    USING (true);
+
+-- Only owners can insert PG metadata for their own properties
+CREATE POLICY "Owners can insert PG metadata"
+    ON public.pgs_metadata
+    FOR INSERT
+    TO authenticated
+    WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM public.pgs
+            WHERE id = pg_id AND owner_id = auth.uid()
+        )
+    );
+
+-- Owners can update metadata for their own PGs
+CREATE POLICY "Owners can update own PG metadata"
+    ON public.pgs_metadata
+    FOR UPDATE
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM public.pgs
+            WHERE id = pg_id AND owner_id = auth.uid()
+        )
+    );
+
+-- Owners can delete metadata for their own PGs
+CREATE POLICY "Owners can delete own PG metadata"
+    ON public.pgs_metadata
+    FOR DELETE
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM public.pgs
+            WHERE id = pg_id AND owner_id = auth.uid()
+        )
+    );
+
 -- ============================================
 -- INDEXES (for performance)
 -- ============================================
@@ -254,6 +384,7 @@ CREATE INDEX IF NOT EXISTS idx_user_metadata_user_id ON public.user_metadata(use
 CREATE INDEX IF NOT EXISTS idx_user_metadata_user_type ON public.user_metadata(user_type);
 CREATE INDEX IF NOT EXISTS idx_pgs_location ON public.pgs(location);
 CREATE INDEX IF NOT EXISTS idx_pgs_owner_id ON public.pgs(owner_id);
+CREATE INDEX IF NOT EXISTS idx_pgs_metadata_pg_id ON public.pgs_metadata(pg_id);
 
 -- ============================================
 -- NOTES

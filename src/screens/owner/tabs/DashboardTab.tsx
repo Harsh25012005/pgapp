@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Modal, ActivityIndicator } from 'react-native';
 import { useAuth } from '../../../contexts/AuthContext';
 import { supabase, PG } from '../../../config/supabase';
+import { AddPropertyPage } from '../AddPropertyPage';
+import { EditPropertyPage } from '../EditPropertyPage';
 
 export const DashboardTab: React.FC = () => {
   const { ownerProfile } = useAuth();
@@ -10,6 +12,9 @@ export const DashboardTab: React.FC = () => {
   const [selectedPG, setSelectedPG] = useState<PG | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showAddProperty, setShowAddProperty] = useState(false);
+  const [showEditProperty, setShowEditProperty] = useState(false);
+  const [editingPG, setEditingPG] = useState<PG | null>(null);
 
   // Custom hook for fetching PGs
   const usePGs = () => {
@@ -55,6 +60,42 @@ export const DashboardTab: React.FC = () => {
     setSelectedPG(pg);
     setShowDropdown(false);
   };
+
+  const handlePropertyAdded = () => {
+    fetchPGs(); // Refresh the PG list
+  };
+
+  const handleEditPG = (pg: PG) => {
+    setEditingPG(pg);
+    setShowEditProperty(true);
+    setShowDropdown(false);
+  };
+
+  const handlePropertyUpdated = () => {
+    fetchPGs(); // Refresh the PG list
+  };
+
+  if (showAddProperty) {
+    return (
+      <AddPropertyPage
+        onBack={() => setShowAddProperty(false)}
+        onPropertyAdded={handlePropertyAdded}
+      />
+    );
+  }
+
+  if (showEditProperty && editingPG) {
+    return (
+      <EditPropertyPage
+        pg={editingPG}
+        onBack={() => {
+          setShowEditProperty(false);
+          setEditingPG(null);
+        }}
+        onPropertyUpdated={handlePropertyUpdated}
+      />
+    );
+  }
 
   return (
     <ScrollView className="flex-1 bg-white">
@@ -124,7 +165,10 @@ export const DashboardTab: React.FC = () => {
       <View className="mb-6 px-8">
         <Text className="mb-4 text-lg font-medium text-gray-900">Quick Actions</Text>
 
-        <TouchableOpacity className="mb-3 rounded-lg bg-gray-900 p-5">
+        <TouchableOpacity 
+          className="mb-3 rounded-lg bg-gray-900 p-5"
+          onPress={() => setShowAddProperty(true)}
+        >
           <Text className="mb-1 text-base font-medium text-white">Add New Property</Text>
           <Text className="text-sm font-light text-gray-300">List a new PG property</Text>
         </TouchableOpacity>
@@ -194,15 +238,22 @@ export const DashboardTab: React.FC = () => {
                 <ScrollView className="max-h-80">
                   {pgs.length > 0 ? (
                     pgs.map((item) => (
-                      <TouchableOpacity
-                        key={item.id}
-                        className="border-b border-gray-100 p-4"
-                        onPress={() => {
-                          handlePGSelect(item);
-                        }}>
-                        <Text className="text-base font-medium text-gray-900">{item.name}</Text>
-                        <Text className="text-sm text-gray-500">{item.location}</Text>
-                      </TouchableOpacity>
+                      <View key={item.id} className="border-b border-gray-100">
+                        <TouchableOpacity
+                          className="p-4"
+                          onPress={() => {
+                            handlePGSelect(item);
+                          }}>
+                          <Text className="text-base font-medium text-gray-900">{item.name}</Text>
+                          <Text className="text-sm text-gray-500">{item.location}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          className="border-t border-gray-100 px-4 py-2 bg-gray-50"
+                          onPress={() => handleEditPG(item)}
+                        >
+                          <Text className="text-sm font-medium text-blue-600">✏️ Edit Property</Text>
+                        </TouchableOpacity>
+                      </View>
                     ))
                   ) : (
                     <View className="p-6">
@@ -223,6 +274,7 @@ export const DashboardTab: React.FC = () => {
           </TouchableOpacity>
         </View>
       )}
+
     </ScrollView>
   );
 };

@@ -46,9 +46,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .from('user_profiles')
           .select('*')
           .eq('id', userId)
-          .single();
+          .maybeSingle();
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error fetching user profile:', error);
+          return;
+        }
         setUserProfile(data);
         setOwnerProfile(null);
       } else if (type === 'owner') {
@@ -56,9 +59,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .from('owner_profiles')
           .select('*')
           .eq('id', userId)
-          .single();
+          .maybeSingle();
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error fetching owner profile:', error);
+          return;
+        }
         setOwnerProfile(data);
         setUserProfile(null);
       }
@@ -74,9 +80,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from('user_metadata')
         .select('user_type')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching user type:', error);
+        return null;
+      }
+      
       return data?.user_type || null;
     } catch (error) {
       console.error('Error fetching user type:', error);
