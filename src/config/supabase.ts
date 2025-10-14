@@ -37,18 +37,7 @@ export interface OwnerProfile {
   updated_at: string;
 }
 
-export interface PG {
-  id: string;
-  name: string;
-  location: string;
-  address?: string;
-  description?: string;
-  amenities?: string[];
-  images?: string[];
-  owner_id: string;
-  created_at: string;
-  updated_at: string;
-}
+// PG interface removed - properties tables no longer exist
 
 export interface UserMetadata {
   user_id: string;

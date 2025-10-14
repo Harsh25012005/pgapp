@@ -18,10 +18,14 @@ interface EditPropertyPageProps {
 }
 
 interface PGMetadata {
-  total_floors: number;
-  total_rooms: number;
   total_ac_rooms: number;
+  ac_room_rent: number;
   total_non_ac_rooms: number;
+  non_ac_room_rent: number;
+  total_beds: number;
+  available_beds: number;
+  food_included: boolean;
+  wifi_available: boolean;
 }
 
 export const EditPropertyPage: React.FC<EditPropertyPageProps> = ({ pg, onBack, onPropertyUpdated }) => {
@@ -30,14 +34,22 @@ export const EditPropertyPage: React.FC<EditPropertyPageProps> = ({ pg, onBack, 
   const [loadingData, setLoadingData] = useState(true);
   const [formData, setFormData] = useState({
     name: pg.name || '',
-    location: pg.location || '',
-    genderPreference: 'both',
-    acRoomRent: '',
-    nonAcRoomRent: '',
-    totalFloors: '',
-    totalRooms: '',
+    address: pg.address || '',
+    city: pg.city || '',
+    state: pg.state || '',
+    pinCode: pg.pin_code || '',
+    type: pg.type || 'co-ed',
+    mapLocation: pg.map_location || '',
+    totalFloors: pg.total_floors ? pg.total_floors.toString() : '',
+    totalRooms: pg.total_rooms ? pg.total_rooms.toString() : '',
     totalAcRooms: '',
+    acRoomRent: '',
     totalNonAcRooms: '',
+    nonAcRoomRent: '',
+    totalBeds: '',
+    availableBeds: '',
+    foodIncluded: false,
+    wifiAvailable: false,
   });
 
   useEffect(() => {
@@ -50,7 +62,7 @@ export const EditPropertyPage: React.FC<EditPropertyPageProps> = ({ pg, onBack, 
       const { data, error } = await supabase
         .from('pgs_metadata')
         .select('*')
-        .eq('pg_id', pg.id)
+        .eq('property_id', pg.id)
         .maybeSingle();
 
       if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
@@ -60,30 +72,17 @@ export const EditPropertyPage: React.FC<EditPropertyPageProps> = ({ pg, onBack, 
       if (data) {
         setFormData(prev => ({
           ...prev,
-          totalFloors: data.total_floors ? data.total_floors.toString() : '',
-          totalRooms: data.total_rooms ? data.total_rooms.toString() : '',
           totalAcRooms: data.total_ac_rooms ? data.total_ac_rooms.toString() : '',
+          acRoomRent: data.ac_room_rent ? data.ac_room_rent.toString() : '',
           totalNonAcRooms: data.total_non_ac_rooms ? data.total_non_ac_rooms.toString() : '',
+          nonAcRoomRent: data.non_ac_room_rent ? data.non_ac_room_rent.toString() : '',
+          totalBeds: data.total_beds ? data.total_beds.toString() : '',
+          availableBeds: data.available_beds ? data.available_beds.toString() : '',
+          foodIncluded: data.food_included || false,
+          wifiAvailable: data.wifi_available || false,
         }));
       }
 
-      // Also fetch PG data to get rent information
-      const { data: pgData, error: pgDataError } = await supabase
-        .from('pgs')
-        .select('gender_preference, ac_room_rent, non_ac_room_rent')
-        .eq('id', pg.id)
-        .single();
-
-      if (pgDataError) {
-        console.error('Error fetching PG data:', pgDataError);
-      } else if (pgData) {
-        setFormData(prev => ({
-          ...prev,
-          genderPreference: pgData.gender_preference || 'both',
-          acRoomRent: pgData.ac_room_rent ? pgData.ac_room_rent.toString() : '',
-          nonAcRoomRent: pgData.non_ac_room_rent ? pgData.non_ac_room_rent.toString() : '',
-        }));
-      }
     } catch (error: any) {
       Alert.alert('Error', 'Failed to load property metadata');
     } finally {
@@ -103,8 +102,20 @@ export const EditPropertyPage: React.FC<EditPropertyPageProps> = ({ pg, onBack, 
       Alert.alert('Error', 'Please enter PG name');
       return false;
     }
-    if (!formData.location.trim()) {
-      Alert.alert('Error', 'Please enter location');
+    if (!formData.address.trim()) {
+      Alert.alert('Error', 'Please enter full address');
+      return false;
+    }
+    if (!formData.city.trim()) {
+      Alert.alert('Error', 'Please enter city');
+      return false;
+    }
+    if (!formData.state.trim()) {
+      Alert.alert('Error', 'Please enter state');
+      return false;
+    }
+    if (!formData.pinCode.trim()) {
+      Alert.alert('Error', 'Please enter pin code');
       return false;
     }
     if (!formData.acRoomRent.trim() && !formData.nonAcRoomRent.trim()) {
@@ -130,10 +141,14 @@ export const EditPropertyPage: React.FC<EditPropertyPageProps> = ({ pg, onBack, 
         .from('pgs')
         .update({
           name: formData.name.trim(),
-          location: formData.location.trim(),
-          gender_preference: formData.genderPreference,
-          ac_room_rent: formData.acRoomRent ? parseFloat(formData.acRoomRent) : null,
-          non_ac_room_rent: formData.nonAcRoomRent ? parseFloat(formData.nonAcRoomRent) : null,
+          address: formData.address.trim(),
+          city: formData.city.trim(),
+          state: formData.state.trim(),
+          pin_code: formData.pinCode.trim(),
+          type: formData.type,
+          map_location: formData.mapLocation.trim() || null,
+          total_floors: formData.totalFloors ? parseInt(formData.totalFloors) : null,
+          total_rooms: formData.totalRooms ? parseInt(formData.totalRooms) : null,
         })
         .eq('id', pg.id);
 
@@ -143,7 +158,7 @@ export const EditPropertyPage: React.FC<EditPropertyPageProps> = ({ pg, onBack, 
       const { data: existingMetadata, error: checkError } = await supabase
         .from('pgs_metadata')
         .select('id')
-        .eq('pg_id', pg.id)
+        .eq('property_id', pg.id)
         .maybeSingle();
 
       if (checkError && checkError.code !== 'PGRST116') {
@@ -151,11 +166,15 @@ export const EditPropertyPage: React.FC<EditPropertyPageProps> = ({ pg, onBack, 
       }
 
       const metadataPayload = {
-        pg_id: pg.id,
-        total_floors: formData.totalFloors ? parseInt(formData.totalFloors) : null,
-        total_rooms: formData.totalRooms ? parseInt(formData.totalRooms) : null,
+        property_id: pg.id,
         total_ac_rooms: formData.totalAcRooms ? parseInt(formData.totalAcRooms) : null,
+        ac_room_rent: formData.acRoomRent ? parseInt(formData.acRoomRent) : null,
         total_non_ac_rooms: formData.totalNonAcRooms ? parseInt(formData.totalNonAcRooms) : null,
+        non_ac_room_rent: formData.nonAcRoomRent ? parseInt(formData.nonAcRoomRent) : null,
+        total_beds: formData.totalBeds ? parseInt(formData.totalBeds) : null,
+        available_beds: formData.availableBeds ? parseInt(formData.availableBeds) : null,
+        food_included: formData.foodIncluded,
+        wifi_available: formData.wifiAvailable,
       };
 
       if (existingMetadata) {
@@ -227,40 +246,92 @@ export const EditPropertyPage: React.FC<EditPropertyPageProps> = ({ pg, onBack, 
           />
         </View>
 
-        {/* Location */}
+        {/* Address */}
         <View className="mb-6">
-          <Text className="mb-2 text-base font-medium text-gray-900">Location *</Text>
+          <Text className="mb-2 text-base font-medium text-gray-900">Full Address *</Text>
           <TextInput
             className="rounded-lg border border-gray-300 bg-white px-4 py-3 text-base text-gray-900"
-            placeholder="Enter location (e.g., Koramangala, Bangalore)"
-            value={formData.location}
-            onChangeText={(value) => handleInputChange('location', value)}
+            placeholder="Enter complete address"
+            value={formData.address}
+            onChangeText={(value) => handleInputChange('address', value)}
+            editable={!loading}
+            multiline
+            numberOfLines={3}
+          />
+        </View>
+
+        {/* City, State, Pin Code Row */}
+        <View className="mb-6">
+          <View className="flex-row mb-4">
+            <View className="flex-1 mr-2">
+              <Text className="mb-2 text-base font-medium text-gray-900">City *</Text>
+              <TextInput
+                className="rounded-lg border border-gray-300 bg-white px-4 py-3 text-base text-gray-900"
+                placeholder="City"
+                value={formData.city}
+                onChangeText={(value) => handleInputChange('city', value)}
+                editable={!loading}
+              />
+            </View>
+            <View className="flex-1 ml-2">
+              <Text className="mb-2 text-base font-medium text-gray-900">State *</Text>
+              <TextInput
+                className="rounded-lg border border-gray-300 bg-white px-4 py-3 text-base text-gray-900"
+                placeholder="State"
+                value={formData.state}
+                onChangeText={(value) => handleInputChange('state', value)}
+                editable={!loading}
+              />
+            </View>
+          </View>
+          
+          <View className="mb-4">
+            <Text className="mb-2 text-base font-medium text-gray-900">Pin Code *</Text>
+            <TextInput
+              className="rounded-lg border border-gray-300 bg-white px-4 py-3 text-base text-gray-900"
+              placeholder="Enter pin code"
+              value={formData.pinCode}
+              onChangeText={(value) => handleInputChange('pinCode', value)}
+              keyboardType="numeric"
+              editable={!loading}
+            />
+          </View>
+        </View>
+
+        {/* Map Location */}
+        <View className="mb-6">
+          <Text className="mb-2 text-base font-medium text-gray-900">Map Location (Optional)</Text>
+          <TextInput
+            className="rounded-lg border border-gray-300 bg-white px-4 py-3 text-base text-gray-900"
+            placeholder="Google Maps link or coordinates"
+            value={formData.mapLocation}
+            onChangeText={(value) => handleInputChange('mapLocation', value)}
             editable={!loading}
           />
         </View>
 
-        {/* Gender Preference */}
+        {/* PG Type */}
         <View className="mb-6">
-          <Text className="mb-4 text-base font-medium text-gray-900">Gender Preference</Text>
+          <Text className="mb-4 text-base font-medium text-gray-900">PG Type</Text>
           
           <View className="flex-row flex-wrap">
             {[
               { key: 'girls', label: 'Girls Only', color: 'pink' },
               { key: 'boys', label: 'Boys Only', color: 'blue' },
-              { key: 'both', label: 'Both (Co-ed)', color: 'green' },
+              { key: 'co-ed', label: 'Co-ed', color: 'green' },
             ].map((option) => (
               <TouchableOpacity
                 key={option.key}
                 className={`mb-3 mr-3 rounded-lg border px-4 py-3 ${
-                  formData.genderPreference === option.key
+                  formData.type === option.key
                     ? `border-${option.color}-500 bg-${option.color}-50`
                     : 'border-gray-300 bg-white'
                 }`}
-                onPress={() => handleInputChange('genderPreference', option.key)}
+                onPress={() => handleInputChange('type', option.key)}
                 disabled={loading}
               >
                 <Text className={`text-sm font-medium ${
-                  formData.genderPreference === option.key ? `text-${option.color}-700` : 'text-gray-700'
+                  formData.type === option.key ? `text-${option.color}-700` : 'text-gray-700'
                 }`}>
                   {option.label}
                 </Text>
@@ -302,52 +373,118 @@ export const EditPropertyPage: React.FC<EditPropertyPageProps> = ({ pg, onBack, 
         <View className="mb-6">
           <Text className="mb-4 text-base font-medium text-gray-900">Property Structure Details</Text>
           
-          <View className="mb-4">
-            <Text className="mb-2 text-sm font-medium text-gray-700">Total Floors</Text>
-            <TextInput
-              className="rounded-lg border border-gray-300 bg-white px-4 py-3 text-base text-gray-900"
-              placeholder="Enter total number of floors"
-              value={formData.totalFloors}
-              onChangeText={(value) => handleInputChange('totalFloors', value)}
-              keyboardType="numeric"
-              editable={!loading}
-            />
+          <View className="flex-row mb-4">
+            <View className="flex-1 mr-2">
+              <Text className="mb-2 text-sm font-medium text-gray-700">Total Floors</Text>
+              <TextInput
+                className="rounded-lg border border-gray-300 bg-white px-4 py-3 text-base text-gray-900"
+                placeholder="Floors"
+                value={formData.totalFloors}
+                onChangeText={(value) => handleInputChange('totalFloors', value)}
+                keyboardType="numeric"
+                editable={!loading}
+              />
+            </View>
+            <View className="flex-1 ml-2">
+              <Text className="mb-2 text-sm font-medium text-gray-700">Total Rooms</Text>
+              <TextInput
+                className="rounded-lg border border-gray-300 bg-white px-4 py-3 text-base text-gray-900"
+                placeholder="Rooms"
+                value={formData.totalRooms}
+                onChangeText={(value) => handleInputChange('totalRooms', value)}
+                keyboardType="numeric"
+                editable={!loading}
+              />
+            </View>
           </View>
 
-          <View className="mb-4">
-            <Text className="mb-2 text-sm font-medium text-gray-700">Total Rooms</Text>
-            <TextInput
-              className="rounded-lg border border-gray-300 bg-white px-4 py-3 text-base text-gray-900"
-              placeholder="Enter total number of rooms"
-              value={formData.totalRooms}
-              onChangeText={(value) => handleInputChange('totalRooms', value)}
-              keyboardType="numeric"
-              editable={!loading}
-            />
+          <View className="flex-row mb-4">
+            <View className="flex-1 mr-2">
+              <Text className="mb-2 text-sm font-medium text-gray-700">AC Rooms</Text>
+              <TextInput
+                className="rounded-lg border border-gray-300 bg-white px-4 py-3 text-base text-gray-900"
+                placeholder="AC rooms"
+                value={formData.totalAcRooms}
+                onChangeText={(value) => handleInputChange('totalAcRooms', value)}
+                keyboardType="numeric"
+                editable={!loading}
+              />
+            </View>
+            <View className="flex-1 ml-2">
+              <Text className="mb-2 text-sm font-medium text-gray-700">Non-AC Rooms</Text>
+              <TextInput
+                className="rounded-lg border border-gray-300 bg-white px-4 py-3 text-base text-gray-900"
+                placeholder="Non-AC rooms"
+                value={formData.totalNonAcRooms}
+                onChangeText={(value) => handleInputChange('totalNonAcRooms', value)}
+                keyboardType="numeric"
+                editable={!loading}
+              />
+            </View>
           </View>
 
-          <View className="mb-4">
-            <Text className="mb-2 text-sm font-medium text-gray-700">Total AC Rooms</Text>
-            <TextInput
-              className="rounded-lg border border-gray-300 bg-white px-4 py-3 text-base text-gray-900"
-              placeholder="Enter number of AC rooms"
-              value={formData.totalAcRooms}
-              onChangeText={(value) => handleInputChange('totalAcRooms', value)}
-              keyboardType="numeric"
-              editable={!loading}
-            />
+          <View className="flex-row mb-4">
+            <View className="flex-1 mr-2">
+              <Text className="mb-2 text-sm font-medium text-gray-700">Total Beds</Text>
+              <TextInput
+                className="rounded-lg border border-gray-300 bg-white px-4 py-3 text-base text-gray-900"
+                placeholder="Total beds"
+                value={formData.totalBeds}
+                onChangeText={(value) => handleInputChange('totalBeds', value)}
+                keyboardType="numeric"
+                editable={!loading}
+              />
+            </View>
+            <View className="flex-1 ml-2">
+              <Text className="mb-2 text-sm font-medium text-gray-700">Available Beds</Text>
+              <TextInput
+                className="rounded-lg border border-gray-300 bg-white px-4 py-3 text-base text-gray-900"
+                placeholder="Available beds"
+                value={formData.availableBeds}
+                onChangeText={(value) => handleInputChange('availableBeds', value)}
+                keyboardType="numeric"
+                editable={!loading}
+              />
+            </View>
           </View>
+        </View>
 
-          <View className="mb-4">
-            <Text className="mb-2 text-sm font-medium text-gray-700">Total Non-AC Rooms</Text>
-            <TextInput
-              className="rounded-lg border border-gray-300 bg-white px-4 py-3 text-base text-gray-900"
-              placeholder="Enter number of non-AC rooms"
-              value={formData.totalNonAcRooms}
-              onChangeText={(value) => handleInputChange('totalNonAcRooms', value)}
-              keyboardType="numeric"
-              editable={!loading}
-            />
+        {/* Amenities */}
+        <View className="mb-6">
+          <Text className="mb-4 text-base font-medium text-gray-900">Amenities</Text>
+          
+          <View className="flex-row mb-3">
+            <TouchableOpacity
+              className={`flex-1 mr-2 rounded-lg border px-4 py-3 ${
+                formData.foodIncluded
+                  ? 'border-green-500 bg-green-50'
+                  : 'border-gray-300 bg-white'
+              }`}
+              onPress={() => handleInputChange('foodIncluded', !formData.foodIncluded)}
+              disabled={loading}
+            >
+              <Text className={`text-sm font-medium text-center ${
+                formData.foodIncluded ? 'text-green-700' : 'text-gray-700'
+              }`}>
+                🍽️ Food Included
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              className={`flex-1 ml-2 rounded-lg border px-4 py-3 ${
+                formData.wifiAvailable
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-gray-300 bg-white'
+              }`}
+              onPress={() => handleInputChange('wifiAvailable', !formData.wifiAvailable)}
+              disabled={loading}
+            >
+              <Text className={`text-sm font-medium text-center ${
+                formData.wifiAvailable ? 'text-blue-700' : 'text-gray-700'
+              }`}>
+                📶 Wi-Fi Available
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
 
